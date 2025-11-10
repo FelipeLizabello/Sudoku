@@ -1,74 +1,49 @@
-from queue import Queue
+from collections import defaultdict
 
-class AdjNode:
-    def __init__(self, num_vertex):
-        self.num_vertex = num_vertex
-        self.next = None
+class classGraph:
+    def __init__(self, connections, directed=False):
+        self._graph = defaultdict(set)
+        self._directed = directed
+        self._add_connections(connections)
 
-class Graph:
-    def __init__(self, num):
-        self.V = num
-        self.graph = [None] * self.V
+    def _add_connections(self, connections):
+        for node1 , node2 in connections:
+            self.add(node1, node2)
 
-    def add_edge(self, s, d):
-        node = AdjNode(d)
-        node.next = self.graph[s]
-        self.graph[s] = node
-
-        node = AdjNode(s)
-        node.next = self.graph[d]
-        self.graph[d] = node
-
-
-    def highest_saturation_adjacent(self, colors, vertex):
-        max_saturation = -1
-        max_vertex = None
-        temp = self.graph[vertex]
-        while temp:
-            v = temp.num_vertex
-            if colors[v] is not None:
-                temp = temp.next
-                continue
-            neighbor_colors = set()
-            temp2 = self.graph[v]
-            while temp2:
-                if colors[temp2.num_vertex] is not None:
-                    neighbor_colors.add(colors[temp2.num_vertex])
-                temp2 = temp2.next
-            saturation = len(neighbor_colors)
-            if saturation > max_saturation:
-                max_saturation = saturation
-                max_vertex = v
-            temp = temp.next
-        return max_vertex
+    def add(self, node1, node2):
+        self._graph[node1].add(node2)
+        self._graph[node2].add(node1)
     
-    def color_vertex(self, colors, vertex):
-        neighbor_colors = set()
-        temp = self.graph[vertex]
-        while temp:
-            if colors[temp.num_vertex] is not None:
-                neighbor_colors.add(colors[temp.num_vertex])
-            temp = temp.next
-        for color in range(self.V):
-            if color not in neighbor_colors:
-                colors[vertex] = color
-                return color
-        return None
+    def is_connected(self, node1, node2):
+        return node1 in self._graph and node2 in self._graph[node1]
+    
+    def set_color(self, node, color, colors):
+        colors[node] = color
 
-    def colorir(self):
-        fila = Queue()
-        colors = [None] * self.V
-        begin = self.highest_saturation_vertex(colors)
-        fila.put(begin)
-        while not fila.empty():
-            vertice = fila.get()
-            adjacentVertex = self.highest_saturation_vertex(vertice)
-            while adjacentVertex is not None:
-                color = self.colorVertex(adjacentVertex)
-                if color is None:
-                    return False
-                fila.put(adjacentVertex)
-                adjacentVertex = self.highest_saturation_vertex(vertice)
-        return true
+    def highest_saturation(self, colors):
+        max_sat = -1
+        max_degree = -1
+        candidate = None
 
-        
+        for node in self._graph: 
+            if colors.get(node) is not None:
+                continue 
+            neighbor_colors = set(colors.get(neigh) for neigh in self._graph[node] if colors.get(neigh) is not None)
+            saturation = len(neighbor_colors)
+            degree = len(self._graph[node])
+            if (saturation > max_sat) or (saturation == max_sat and degree > max_degree):
+                max_sat = saturation
+                max_degree = degree
+                candidate = node
+        return candidate
+
+    def saturBFS(self, available_colors):
+        colors = {}
+        while len(colors) < len(self._graph):
+            node = self.highest_saturation(colors)
+            neighbor_colors = set(colors.get(neigh) for neigh in self._graph[node] if colors.get(neigh) is not None)
+            for color in available_colors:
+                if color not in neighbor_colors:
+                    self.set_color(node, color, colors)
+                    break
+        return colors

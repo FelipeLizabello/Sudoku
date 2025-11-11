@@ -38,12 +38,13 @@ def _valor_valido(tabuleiro, linha, coluna, valor):
 def gerar_tabuleiro():
     graph = _construir_grafo()
     cores = list(range(1, 10))
-
+    cont = 0
     for _ in range(1000):
         tabuleiro = [[0 for _ in range(9)] for _ in range(9)]
         posicoes = random.sample([(i, j) for i in range(9) for j in range(9)], 17)
         preset = {}
         falhou = False
+        cont += 1
 
         for i, j in posicoes:
             candidatos = cores[:]
@@ -62,13 +63,13 @@ def gerar_tabuleiro():
 
         coloracao = graph.saturBFS(cores, preset)
         if coloracao:
-            return graph._graph, tabuleiro, coloracao
+            return graph._graph, tabuleiro, coloracao, cont
 
     return None, None, None
 
 
 if __name__ == '__main__':
-    connections, tabuleiro, solucao = gerar_tabuleiro()
+    connections, tabuleiro, solucao, cont = gerar_tabuleiro()
     if connections is None:
         print('Falha ao gerar Sudoku.')
     else:
@@ -77,3 +78,5 @@ if __name__ == '__main__':
         print('\nSolução completa:')
         for i in range(9):
             print([solucao[(i, j)] for j in range(9)])
+
+    print(cont)

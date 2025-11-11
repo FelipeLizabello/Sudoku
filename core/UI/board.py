@@ -4,16 +4,8 @@ import math
 import random
 import time
 import pygame as pg
-
-pg.init()
-screen_size = 1280, 720
-screen = pg.display.set_mode(screen_size)
-import sys
-import os
-import math
-import random
-import time
-import pygame as pg
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from core.graph.generator import gerar_tabuleiro
 
 pg.init()
 screen_size = 1280, 720
@@ -226,6 +218,9 @@ def draw_scanlines(surface, spacing=4, alpha=10):
     surface.blit(sl, (0, 0), special_flags=pg.BLEND_RGBA_SUB)
 
 
+connections, tabuleiro, solucao, _ = gerar_tabuleiro()
+
+
 def draw_board():
     t = time.time()
     draw_starfield(screen, t)
@@ -295,6 +290,21 @@ def draw_board():
                 pass
             continue
         draw_bolt(screen, evt, age)
+
+    cell = inner.width // 9
+    try:
+        font = pg.font.SysFont("couriernew", 44, bold=True)
+    except Exception:
+        font = pg.font.SysFont(None, 44, bold=True)
+
+    for i in range(9):
+        for j in range(9):
+            valor = tabuleiro[i][j]
+            if valor != 0:
+                text = font.render(str(valor), True, (220, 240, 220))
+                x = inner.x + j * cell + cell // 2 - text.get_width() // 2
+                y = inner.y + i * cell + cell // 2 - text.get_height() // 2
+                screen.blit(text, (x, y))
 
 
 def game_loop():

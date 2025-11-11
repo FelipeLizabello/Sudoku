@@ -1,14 +1,9 @@
 from collections import defaultdict
 
 class classGraph:
-    def __init__(self, connections, directed=False):
+    def __init__(self, directed=False):
         self._graph = defaultdict(set)
         self._directed = directed
-        self._add_connections(connections)
-
-    def _add_connections(self, connections):
-        for node1 , node2 in connections:
-            self.add(node1, node2)
 
     def add(self, node1, node2):
         self._graph[node1].add(node2)
@@ -25,10 +20,14 @@ class classGraph:
         max_degree = -1
         candidate = None
 
-        for node in self._graph: 
+        for node in self._graph:
             if colors.get(node) is not None:
-                continue 
-            neighbor_colors = set(colors.get(neigh) for neigh in self._graph[node] if colors.get(neigh) is not None)
+                continue
+            neighbor_colors = {
+                colors.get(neigh)
+                for neigh in self._graph[node]
+                if colors.get(neigh) is not None
+            }
             saturation = len(neighbor_colors)
             degree = len(self._graph[node])
             if (saturation > max_sat) or (saturation == max_sat and degree > max_degree):
@@ -37,13 +36,31 @@ class classGraph:
                 candidate = node
         return candidate
 
-    def saturBFS(self, available_colors):
-        colors = {}
+    def saturBFS(self, available_colors, preset=None):
+        colors = {} if preset is None else preset.copy()
+
+        if preset:
+            for node, color in preset.items():
+                for neighbor in self._graph[node]:
+                    if colors.get(neighbor) == color:
+                        return None
+
         while len(colors) < len(self._graph):
             node = self.highest_saturation(colors)
-            neighbor_colors = set(colors.get(neigh) for neigh in self._graph[node] if colors.get(neigh) is not None)
+            if node is None:
+                break
+
+            neighbor_colors = {
+                colors.get(neigh)
+                for neigh in self._graph[node]
+                if colors.get(neigh) is not None
+            }
+
             for color in available_colors:
                 if color not in neighbor_colors:
                     self.set_color(node, color, colors)
                     break
+            else:
+                return None
+
         return colors

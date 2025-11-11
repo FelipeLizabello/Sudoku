@@ -3,8 +3,7 @@ import os
 import random
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from core.graph.Graph import classGraph  # noqa: E402
-
+from core.graph.Graph import classGraph
 
 def _construir_grafo():
     graph = classGraph()

@@ -235,6 +235,11 @@ reveal_active = False
 conflict_highlights = []
 conflict_duration = 0.8
 
+status_message = ""
+status_message_expire = 0.0
+status_message_color = (200, 220, 230)
+STATUS_MESSAGE_DURATION = 3.0
+
 
 def is_move_valid(row, col, value, board_state=None):
     """Return True if placing `value` at (row,col) doesn't conflict with neighbors.
@@ -277,6 +282,29 @@ def _highlight_conflict_at(row, col, value):
     for r, c in neighs:
         if tabuleiro[r][c] == value:
             conflict_highlights.append((r, c, expire))
+
+
+def _set_status_message(text, color, duration=STATUS_MESSAGE_DURATION):
+    global status_message, status_message_color, status_message_expire
+    status_message = text
+    status_message_color = color
+    status_message_expire = time.time() + duration
+
+
+def validate_current_board():
+    if tabuleiro is None or connections is None:
+        return False, "Tabuleiro indisponível."
+    for r in range(9):
+        for c in range(9):
+            valor = tabuleiro[r][c]
+            if valor not in range(1, 10):
+                return False, "Ainda há casas vazias ou inválidas."
+            for nr, nc in connections.get((r, c), set()):
+                if (nr, nc) <= (r, c):
+                    continue
+                if tabuleiro[nr][nc] == valor:
+                    return False, "Existem conflitos no tabuleiro."
+    return True, "Tabuleiro correto! Parabéns."
 
 
 def start_fill_animation(interval=0.05, random_order=False):
@@ -473,6 +501,14 @@ def draw_board():
     # keep only non-expired
     conflict_highlights[:] = remaining
 
+    if status_message and now < status_message_expire:
+        try:
+            msg_font = pg.font.SysFont("couriernew", 28, bold=True)
+        except Exception:
+            msg_font = pg.font.SysFont(None, 28, bold=True)
+        msg_surf = msg_font.render(status_message, True, status_message_color)
+        screen.blit(msg_surf, (board_x + 20, inner.bottom - msg_surf.get_height() - 12))
+
 
 def game_loop():
     global selected_cell, preset_positions, tabuleiro
@@ -532,9 +568,15 @@ def game_loop():
                     if 0 <= row < 9 and 0 <= col < 9:
                         selected_cell = (row, col)
 
-    draw_board()
-    pg.display.flip()
-    clock.tick(60)
+        if event.type == pg.KEYDOWN:
+            if event.key == pg.K_RETURN or event.key == pg.K_KP_ENTER:
+                success, msg = validate_current_board()
+                color = (120, 230, 160) if success else (230, 120, 120)
+                _set_status_message(msg, color)
+
+        draw_board()
+        pg.display.flip()
+        clock.tick(60)
 
 
 if __name__ == '__main__':

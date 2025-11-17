@@ -218,7 +218,97 @@ def draw_scanlines(surface, spacing=4, alpha=10):
     surface.blit(sl, (0, 0), special_flags=pg.BLEND_RGBA_SUB)
 
 
-connections, tabuleiro, solucao, _ = gerar_tabuleiro()
+connections = None
+tabuleiro = None
+solucao = None
+_ = None
+
+show_solution = False
+# Animation state for revealing the rest of the board
+animated_board = None
+fill_positions = []
+reveal_index = 0
+reveal_start_time = 0.0
+reveal_interval = 0.05  # seconds between revealing cells
+reveal_active = False
+
+conflict_highlights = []
+conflict_duration = 0.8
+
+
+def is_move_valid(row, col, value, board_state=None):
+    """Return True if placing `value` at (row,col) doesn't conflict with neighbors.
+    Uses the `connections` adjacency mapping produced by the generator.
+    If board_state is None uses the global `tabuleiro`.
+    """
+    if value == 0:
+        return True
+    if board_state is None:
+        board_state = tabuleiro
+    neighs = connections.get((row, col), set()) if connections is not None else set()
+    for n in neighs:
+        r, c = n
+        if board_state[r][c] == value:
+            return False
+    return True
+
+
+def get_candidates(row, col, board_state=None):
+    """Return a sorted list of possible values (1..9) that don't conflict at (row,col)."""
+    if board_state is None:
+        board_state = tabuleiro
+    used = set()
+    neighs = connections.get((row, col), set()) if connections is not None else set()
+    for n in neighs:
+        r, c = n
+        v = board_state[r][c]
+        if v != 0:
+            used.add(v)
+    return [v for v in range(1, 10) if v not in used]
+
+
+def _highlight_conflict_at(row, col, value):
+    """Register conflict highlight for attempted invalid placement at (row,col)
+    and any neighbors that contain the conflicting value."""
+    now = time.time()
+    expire = now + conflict_duration
+    conflict_highlights.append((row, col, expire))
+    neighs = connections.get((row, col), set()) if connections is not None else set()
+    for r, c in neighs:
+        if tabuleiro[r][c] == value:
+            conflict_highlights.append((r, c, expire))
+
+
+def start_fill_animation(interval=0.05, random_order=False):
+    """Inicializa o estado para animar o preenchimento das casas vazias.
+    Por padrão ordena em leitura (linha-major). Se random_order=True,
+    embaralha a ordem de revelação.
+    """
+    global animated_board, fill_positions, reveal_index, reveal_start_time, reveal_interval, reveal_active
+    if tabuleiro is None or solucao is None:
+        return
+    animated_board = [row[:] for row in tabuleiro]
+    # posições que estão vazias no puzzle original
+    fill_positions = [(i, j) for i in range(9) for j in range(9) if tabuleiro[i][j] == 0]
+    if random_order:
+        random.shuffle(fill_positions)
+    reveal_index = 0
+    reveal_start_time = time.time()
+    reveal_interval = interval
+    reveal_active = True
+
+
+def stop_fill_animation():
+    global reveal_active
+    reveal_active = False
+
+
+# --- Interaction state (for 'Jogar' mode) ---
+# set of coordinates which are presets (non-editable)
+preset_positions = set()
+# currently selected cell (row, col)
+selected_cell = (0, 0)
+
 
 
 def draw_board():
@@ -297,21 +387,150 @@ def draw_board():
     except Exception:
         font = pg.font.SysFont(None, 44, bold=True)
 
+    # Choose which board to display: the puzzle or the full solution
+    # Determine display board depending on animation state
+    global animated_board, reveal_active, reveal_index, reveal_start_time, fill_positions
+
+    if reveal_active and animated_board is not None:
+        # update how many cells should be revealed based on elapsed time
+        elapsed = time.time() - reveal_start_time
+        should_reveal = min(len(fill_positions), int(elapsed / reveal_interval))
+        # reveal progressively
+        while reveal_index < should_reveal:
+            i, j = fill_positions[reveal_index]
+            # obtain solution value (support dict or 2D list)
+            if isinstance(solucao, dict):
+                v = solucao.get((i, j), 0)
+            else:
+                v = solucao[i][j]
+            animated_board[i][j] = v
+            reveal_index += 1
+
+        display_tabuleiro = animated_board
+
+        # if finished, stop animation
+        if reveal_index >= len(fill_positions):
+            reveal_active = False
+    else:
+        if show_solution:
+            # generator can return solution as a dict mapping (i,j)->value
+            if isinstance(solucao, dict):
+                display_tabuleiro = [[solucao.get((i, j), 0) for j in range(9)] for i in range(9)]
+            else:
+                display_tabuleiro = solucao
+        else:
+            display_tabuleiro = tabuleiro
+
+    # Draw selection highlight if in play mode (not showing full solution)
+    try:
+        global selected_cell, preset_positions
+    except Exception:
+        selected_cell = (0, 0)
+        preset_positions = set()
+
+    if not show_solution:
+        sel_r, sel_c = selected_cell
+        # clamp
+        sel_r = max(0, min(8, sel_r))
+        sel_c = max(0, min(8, sel_c))
+        sel_x = inner.x + sel_c * cell
+        sel_y = inner.y + sel_r * cell
+        sel_rect = pg.Rect(sel_x, sel_y, cell, cell)
+        # translucent overlay
+        overlay = pg.Surface((cell, cell), flags=pg.SRCALPHA)
+        overlay.fill((40, 220, 200, 30))
+        screen.blit(overlay, (sel_x, sel_y))
+        # border
+        pg.draw.rect(screen, (40, 220, 200), sel_rect, 3)
+
     for i in range(9):
         for j in range(9):
-            valor = tabuleiro[i][j]
+            valor = display_tabuleiro[i][j]
             if valor != 0:
-                text = font.render(str(valor), True, (220, 240, 220))
+                # preset numbers (given by generator) are drawn in a slightly different color
+                if (i, j) in preset_positions:
+                    color = (180, 240, 200)
+                else:
+                    color = (220, 240, 220)
+                text = font.render(str(valor), True, color)
                 x = inner.x + j * cell + cell // 2 - text.get_width() // 2
                 y = inner.y + i * cell + cell // 2 - text.get_height() // 2
                 screen.blit(text, (x, y))
 
+    # draw conflict highlights (fade out over time)
+    now = time.time()
+    remaining = []
+    for (r, c, exp) in conflict_highlights:
+        if exp > now:
+            remaining.append((r, c, exp))
+            alpha = int(200 * ((exp - now) / conflict_duration))
+            cx = inner.x + c * cell
+            cy = inner.y + r * cell
+            surf = pg.Surface((cell, cell), flags=pg.SRCALPHA)
+            surf.fill((230, 50, 50, max(30, alpha)))
+            screen.blit(surf, (cx, cy))
+            pg.draw.rect(screen, (230, 50, 50), pg.Rect(cx, cy, cell, cell), 3)
+    # keep only non-expired
+    conflict_highlights[:] = remaining
+
 
 def game_loop():
+    global selected_cell, preset_positions, tabuleiro
+
     for event in pg.event.get():
         if event.type == pg.QUIT:
             pg.quit()
             sys.exit()
+
+        # Navigation and number input only when NOT showing the solved board
+        if not show_solution:
+            if event.type == pg.KEYDOWN:
+                r, c = selected_cell
+                # arrow keys
+                if event.key == pg.K_UP:
+                    r = (r - 1) % 9
+                elif event.key == pg.K_DOWN:
+                    r = (r + 1) % 9
+                elif event.key == pg.K_LEFT:
+                    c = (c - 1) % 9
+                elif event.key == pg.K_RIGHT:
+                    c = (c + 1) % 9
+                # numeric keys (0-9) - include keypad
+                elif event.unicode and event.unicode in '0123456789':
+                    val = int(event.unicode)
+                    if (r, c) not in preset_positions:
+                        if val == 0:
+                            tabuleiro[r][c] = 0
+                        else:
+                            tabuleiro[r][c] = val
+                elif event.key in (pg.K_KP0, pg.K_KP1, pg.K_KP2, pg.K_KP3, pg.K_KP4, pg.K_KP5, pg.K_KP6, pg.K_KP7, pg.K_KP8, pg.K_KP9):
+                    # keypad keys - map to digit
+                    kp_map = {
+                        pg.K_KP0: 0, pg.K_KP1: 1, pg.K_KP2: 2, pg.K_KP3: 3, pg.K_KP4: 4,
+                        pg.K_KP5: 5, pg.K_KP6: 6, pg.K_KP7: 7, pg.K_KP8: 8, pg.K_KP9: 9,
+                    }
+                    val = kp_map.get(event.key, None)
+                    if val is not None and (r, c) not in preset_positions:
+                        if val == 0:
+                            tabuleiro[r][c] = 0
+                        else:
+                            tabuleiro[r][c] = val
+
+                selected_cell = (r, c)
+
+            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                # allow clicking to select a cell
+                mx, my = event.pos
+                # compute inner board area same as in draw_board
+                board_x = 280
+                board_y = 10
+                inner = pg.Rect(board_x + 10, board_y + 10, 700, 700)
+                if inner.collidepoint(mx, my):
+                    cell = inner.width // 9
+                    col = (mx - inner.x) // cell
+                    row = (my - inner.y) // cell
+                    if 0 <= row < 9 and 0 <= col < 9:
+                        selected_cell = (row, col)
 
     draw_board()
     pg.display.flip()
@@ -323,5 +542,85 @@ if __name__ == '__main__':
         game_loop()
 
         draw_board()
+        pg.display.flip()
+        clock.tick(60)
+
+
+def draw_menu(selected=0):
+    """Desenha a tela de menu. `selected` é o índice da opção destacada."""
+    t = time.time()
+    draw_starfield(screen, t)
+
+    # panel
+    w, h = screen_size
+    menu_rect = pg.Rect(w // 2 - 380, h // 2 - 200, 760, 400)
+    panel = pg.Surface((menu_rect.width, menu_rect.height), flags=pg.SRCALPHA)
+    panel.fill((8, 10, 25, 230))
+    screen.blit(panel, (menu_rect.x, menu_rect.y))
+    neon_rect(screen, menu_rect, (40, 220, 200), glow_size=20, border=6)
+
+    try:
+        title_font = pg.font.SysFont("couriernew", 72, bold=True)
+        opt_font = pg.font.SysFont("couriernew", 48, bold=True)
+    except Exception:
+        title_font = pg.font.SysFont(None, 72, bold=True)
+        opt_font = pg.font.SysFont(None, 48, bold=True)
+
+    title_surf = title_font.render("S U D O K U", True, (140, 240, 220))
+    screen.blit(title_surf, (menu_rect.x + 40, menu_rect.y + 20))
+
+    # opções
+    opts = ["Jogar", "Ver resolução"]
+    base_y = menu_rect.y + 140
+    opt_h = 80
+    rects = []
+    for i, o in enumerate(opts):
+        r = pg.Rect(menu_rect.x + 80, base_y + i * (opt_h + 20), menu_rect.width - 160, opt_h)
+        rects.append(r)
+        color = (40, 220, 200) if i == selected else (70, 100, 140)
+        neon_rect(screen, r, color, glow_size=10, border=4)
+        txt = opt_font.render(o, True, (20, 20, 30) if i == selected else (180, 220, 230))
+        screen.blit(txt, (r.x + 24, r.y + r.height // 2 - txt.get_height() // 2))
+
+    # instruções
+    try:
+        small = pg.font.SysFont("couriernew", 20)
+    except Exception:
+        small = pg.font.SysFont(None, 20)
+    inst = small.render("Use as setas ou clique. Enter seleciona. Esc sai.", True, (180, 200, 220))
+    screen.blit(inst, (menu_rect.x + 40, menu_rect.bottom - 40))
+
+    return rects
+
+
+def menu_loop():
+    """Mostra a tela de menu e retorna 'play' ou 'solution' (ou None se sair)."""
+    selected = 0
+    rects = draw_menu(selected)
+    pg.display.flip()
+
+    while True:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                sys.exit(0)
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_ESCAPE:
+                    pg.quit()
+                    sys.exit(0)
+                if event.key in (pg.K_UP, pg.K_w):
+                    selected = (selected - 1) % 2
+                if event.key in (pg.K_DOWN, pg.K_s):
+                    selected = (selected + 1) % 2
+                if event.key in (pg.K_RETURN, pg.K_KP_ENTER):
+                    return 'play' if selected == 0 else 'solution'
+            if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                for i, r in enumerate(rects):
+                    if r.collidepoint(mx, my):
+                        return 'play' if i == 0 else 'solution'
+
+        # atualizar desenho
+        rects = draw_menu(selected)
         pg.display.flip()
         clock.tick(60)

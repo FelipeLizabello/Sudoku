@@ -574,9 +574,9 @@ def game_loop():
                 color = (120, 230, 160) if success else (230, 120, 120)
                 _set_status_message(msg, color)
 
-        draw_board()
-        pg.display.flip()
-        clock.tick(60)
+    draw_board()
+    pg.display.flip()
+    clock.tick(60)
 
 
 if __name__ == '__main__':

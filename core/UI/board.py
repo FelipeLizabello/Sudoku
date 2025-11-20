@@ -518,11 +518,23 @@ def game_loop():
             pg.quit()
             sys.exit()
 
-        # Navigation and number input only when NOT showing the solved board
+        if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
+            return 'menu'
+
         if not show_solution:
             if event.type == pg.KEYDOWN:
                 r, c = selected_cell
-                # arrow keys
+                try:
+                    ctrl_pressed = (event.mod & pg.KMOD_CTRL) != 0
+                except Exception:
+                    ctrl_pressed = (pg.key.get_mods() & pg.KMOD_CTRL) != 0
+                if ctrl_pressed and event.key in (pg.K_0, pg.K_KP0):
+                    if tabuleiro is not None:
+                        for ii in range(9):
+                            for jj in range(9):
+                                if (ii, jj) not in preset_positions:
+                                    tabuleiro[ii][jj] = 0
+                    r, c = max(0, min(8, r)), max(0, min(8, c))
                 if event.key == pg.K_UP:
                     r = (r - 1) % 9
                 elif event.key == pg.K_DOWN:
@@ -531,7 +543,6 @@ def game_loop():
                     c = (c - 1) % 9
                 elif event.key == pg.K_RIGHT:
                     c = (c + 1) % 9
-                # numeric keys (0-9) - include keypad
                 elif event.unicode and event.unicode in '0123456789':
                     val = int(event.unicode)
                     if (r, c) not in preset_positions:
@@ -621,7 +632,7 @@ def draw_menu(selected=0):
         rects.append(r)
         color = (40, 220, 200) if i == selected else (70, 100, 140)
         neon_rect(screen, r, color, glow_size=10, border=4)
-        txt = opt_font.render(o, True, (20, 20, 30) if i == selected else (180, 220, 230))
+        txt = opt_font.render(o, True, color if i == selected else (180, 220, 230))
         screen.blit(txt, (r.x + 24, r.y + r.height // 2 - txt.get_height() // 2))
 
     # instruções

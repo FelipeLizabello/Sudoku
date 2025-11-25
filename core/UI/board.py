@@ -44,17 +44,14 @@ for _ in range(NUM_STARS):
 
 
 def draw_starfield(surface, t):
-    # base dark space
     surface.fill((6, 6, 20))
 
-    # optional background image blended under stars
     if background_image:
         surface.blit(background_image, (0, 0))
         overlay = pg.Surface(screen_size, flags=pg.SRCALPHA)
         overlay.fill((0, 0, 20, 120))
         surface.blit(overlay, (0, 0))
 
-    # stars
     for s in stars:
         speed = (1.0 - s["z"]) * 40.0
         s["x"] -= speed * 0.016
@@ -111,12 +108,11 @@ def _draw_partial_polyline(surf, pts, cum, seg_lengths, draw_up_to, color, width
 
 
 # ------------------ Lightning (literal bolts top -> bottom) ------------------
-lightning_events = []  # list of events
+lightning_events = []
 LIGHTNING_MAX = 2
 
 
 def generate_bolt(x_center=None, width=screen_size[0], height=screen_size[1]):
-    # create jagged main bolt from top to bottom
     if x_center is None:
         x = random.uniform(120, width - 120)
     else:
@@ -171,20 +167,16 @@ def generate_bolt(x_center=None, width=screen_size[0], height=screen_size[1]):
 
 
 def draw_bolt(surface, event, elapsed):
-    # elapsed seconds since creation
     distance = min(event["length"], elapsed * event["speed"])
 
-    # glow layers: richer cyan -> violet gradient for a dramatic electric look
     glow_layers = [((40, 200, 255, 160), 14), ((160, 80, 220, 110), 8), ((100, 200, 180, 70), 6)]
     for col, w in glow_layers:
         s = pg.Surface(screen_size, flags=pg.SRCALPHA)
         _draw_partial_polyline(s, event["points"], event["cum"], event["seg_lengths"], distance, col, w)
         surface.blit(s, (0, 0), special_flags=pg.BLEND_ADD)
 
-    # bright core (slightly warm-cyan center)
     _draw_partial_polyline(surface, event["points"], event["cum"], event["seg_lengths"], distance, (220, 250, 255), 2)
 
-    # branches with matching palette
     for br in event["branches"]:
         anchor_dist = event["cum"][br["anchor"]]
         if distance <= anchor_dist + br["delay"]:
@@ -224,12 +216,11 @@ solucao = None
 _ = None
 
 show_solution = False
-# Animation state for revealing the rest of the board
 animated_board = None
 fill_positions = []
 reveal_index = 0
 reveal_start_time = 0.0
-reveal_interval = 0.05  # seconds between revealing cells
+reveal_interval = 0.05
 reveal_active = False
 
 conflict_highlights = []
@@ -316,7 +307,6 @@ def start_fill_animation(interval=0.05, random_order=False):
     if tabuleiro is None or solucao is None:
         return
     animated_board = [row[:] for row in tabuleiro]
-    # posições que estão vazias no puzzle original
     fill_positions = [(i, j) for i in range(9) for j in range(9) if tabuleiro[i][j] == 0]
     if random_order:
         random.shuffle(fill_positions)
@@ -332,9 +322,7 @@ def stop_fill_animation():
 
 
 # --- Interaction state (for 'Jogar' mode) ---
-# set of coordinates which are presets (non-editable)
 preset_positions = set()
-# currently selected cell (row, col)
 selected_cell = (0, 0)
 
 
@@ -343,7 +331,6 @@ def draw_board():
     t = time.time()
     draw_starfield(screen, t)
 
-    # board area
     board_x = 280
     board_y = 10
     board_size = 720
@@ -392,13 +379,11 @@ def draw_board():
     draw_scanlines(screen, spacing=6, alpha=8)
 
     # --- Lightning spawning and drawing (literal bolts) ---
-    # spawn occasionally
     if random.random() < 0.006 and len(lightning_events) < LIGHTNING_MAX:
         b = generate_bolt()
         b["created"] = t
         lightning_events.append(b)
 
-    # render active bolts
     for evt in lightning_events[:]:
         age = t - evt["created"]
         if age * evt["speed"] > evt["length"] + 40:
@@ -415,18 +400,13 @@ def draw_board():
     except Exception:
         font = pg.font.SysFont(None, 44, bold=True)
 
-    # Choose which board to display: the puzzle or the full solution
-    # Determine display board depending on animation state
     global animated_board, reveal_active, reveal_index, reveal_start_time, fill_positions
 
     if reveal_active and animated_board is not None:
-        # update how many cells should be revealed based on elapsed time
         elapsed = time.time() - reveal_start_time
         should_reveal = min(len(fill_positions), int(elapsed / reveal_interval))
-        # reveal progressively
         while reveal_index < should_reveal:
             i, j = fill_positions[reveal_index]
-            # obtain solution value (support dict or 2D list)
             if isinstance(solucao, dict):
                 v = solucao.get((i, j), 0)
             else:
@@ -436,12 +416,10 @@ def draw_board():
 
         display_tabuleiro = animated_board
 
-        # if finished, stop animation
         if reveal_index >= len(fill_positions):
             reveal_active = False
     else:
         if show_solution:
-            # generator can return solution as a dict mapping (i,j)->value
             if isinstance(solucao, dict):
                 display_tabuleiro = [[solucao.get((i, j), 0) for j in range(9)] for i in range(9)]
             else:
@@ -449,7 +427,6 @@ def draw_board():
         else:
             display_tabuleiro = tabuleiro
 
-    # Draw selection highlight if in play mode (not showing full solution)
     try:
         global selected_cell, preset_positions
     except Exception:
@@ -458,24 +435,20 @@ def draw_board():
 
     if not show_solution:
         sel_r, sel_c = selected_cell
-        # clamp
         sel_r = max(0, min(8, sel_r))
         sel_c = max(0, min(8, sel_c))
         sel_x = inner.x + sel_c * cell
         sel_y = inner.y + sel_r * cell
         sel_rect = pg.Rect(sel_x, sel_y, cell, cell)
-        # translucent overlay
         overlay = pg.Surface((cell, cell), flags=pg.SRCALPHA)
         overlay.fill((40, 220, 200, 30))
         screen.blit(overlay, (sel_x, sel_y))
-        # border
         pg.draw.rect(screen, (40, 220, 200), sel_rect, 3)
 
     for i in range(9):
         for j in range(9):
             valor = display_tabuleiro[i][j]
             if valor != 0:
-                # preset numbers (given by generator) are drawn in a slightly different color
                 if (i, j) in preset_positions:
                     color = (180, 240, 200)
                 else:
@@ -485,7 +458,6 @@ def draw_board():
                 y = inner.y + i * cell + cell // 2 - text.get_height() // 2
                 screen.blit(text, (x, y))
 
-    # draw conflict highlights (fade out over time)
     now = time.time()
     remaining = []
     for (r, c, exp) in conflict_highlights:
@@ -498,7 +470,6 @@ def draw_board():
             surf.fill((230, 50, 50, max(30, alpha)))
             screen.blit(surf, (cx, cy))
             pg.draw.rect(screen, (230, 50, 50), pg.Rect(cx, cy, cell, cell), 3)
-    # keep only non-expired
     conflict_highlights[:] = remaining
 
     if status_message and now < status_message_expire:
@@ -551,7 +522,6 @@ def game_loop():
                         else:
                             tabuleiro[r][c] = val
                 elif event.key in (pg.K_KP0, pg.K_KP1, pg.K_KP2, pg.K_KP3, pg.K_KP4, pg.K_KP5, pg.K_KP6, pg.K_KP7, pg.K_KP8, pg.K_KP9):
-                    # keypad keys - map to digit
                     kp_map = {
                         pg.K_KP0: 0, pg.K_KP1: 1, pg.K_KP2: 2, pg.K_KP3: 3, pg.K_KP4: 4,
                         pg.K_KP5: 5, pg.K_KP6: 6, pg.K_KP7: 7, pg.K_KP8: 8, pg.K_KP9: 9,
@@ -566,9 +536,7 @@ def game_loop():
                 selected_cell = (r, c)
 
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
-                # allow clicking to select a cell
                 mx, my = event.pos
-                # compute inner board area same as in draw_board
                 board_x = 280
                 board_y = 10
                 inner = pg.Rect(board_x + 10, board_y + 10, 700, 700)
@@ -604,7 +572,6 @@ def draw_menu(selected=0):
     t = time.time()
     draw_starfield(screen, t)
 
-    # panel
     w, h = screen_size
     menu_rect = pg.Rect(w // 2 - 380, h // 2 - 200, 760, 400)
     panel = pg.Surface((menu_rect.width, menu_rect.height), flags=pg.SRCALPHA)
@@ -622,7 +589,6 @@ def draw_menu(selected=0):
     title_surf = title_font.render("S U D O K U", True, (140, 240, 220))
     screen.blit(title_surf, (menu_rect.x + 40, menu_rect.y + 20))
 
-    # opções
     opts = ["Jogar", "Ver resolução"]
     base_y = menu_rect.y + 140
     opt_h = 80
@@ -635,7 +601,6 @@ def draw_menu(selected=0):
         txt = opt_font.render(o, True, color if i == selected else (180, 220, 230))
         screen.blit(txt, (r.x + 24, r.y + r.height // 2 - txt.get_height() // 2))
 
-    # instruções
     try:
         small = pg.font.SysFont("couriernew", 20)
     except Exception:
@@ -673,7 +638,6 @@ def menu_loop():
                     if r.collidepoint(mx, my):
                         return 'play' if i == 0 else 'solution'
 
-        # atualizar desenho
         rects = draw_menu(selected)
         pg.display.flip()
         clock.tick(60)

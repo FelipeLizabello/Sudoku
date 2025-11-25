@@ -1,10 +1,4 @@
 
-"""Launcher do Sudoku com menu gráfico.
-
-Esta versão usa a tela de menu em Pygame fornecida por `core.UI.board.menu_loop()`.
-Depois da escolha (Jogar / Ver resolução) o laço principal do jogo é iniciado.
-"""
-
 import sys
 
 from core.UI import board

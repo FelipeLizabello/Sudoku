@@ -35,37 +35,57 @@ def _valor_valido(tabuleiro, linha, coluna, valor):
     return True
 
 
-def gerar_tabuleiro():
+def _encontrar_vazio(tabuleiro):
+    for i in range(9):
+        for j in range(9):
+            if tabuleiro[i][j] == 0:
+                return i, j
+    return None
+
+def _contar_solucoes(tabuleiro):
+    vazio = _encontrar_vazio(tabuleiro)
+    if vazio is None:
+        return 1
+
+    linha, coluna = vazio
+    total = 0
+
+    for valor in range(1, 10):
+        if _valor_valido(tabuleiro, linha, coluna, valor):
+            tabuleiro[linha][coluna] = valor
+            total += _contar_solucoes(tabuleiro)
+            tabuleiro[linha][coluna] = 0
+            if total > 1:
+                break
+            
+
+    return total
+
+
+def gerar_tabuleiro_unico():
     graph = _construir_grafo()
     cores = list(range(1, 10))
-    cont = 0
-    for _ in range(1000):
-        tabuleiro = [[0 for _ in range(9)] for _ in range(9)]
-        posicoes = random.sample([(i, j) for i in range(9) for j in range(9)], 17)
-        preset = {}
-        falhou = False
-        cont += 1
 
-        for i, j in posicoes:
-            candidatos = cores[:]
-            random.shuffle(candidatos)
-            for valor in candidatos:
-                if _valor_valido(tabuleiro, i, j, valor):
-                    tabuleiro[i][j] = valor
-                    preset[(i, j)] = valor
-                    break
-            else:
-                falhou = True
-                break
+    solucao = graph.satur_backtracking(cores)
+    if not solucao:
+        return None, None, None
 
-        if falhou:
-            continue
+    tabuleiro = [[solucao[(i, j)] for j in range(9)] for i in range(9)]
+    celulas = [(i, j) for i in range(9) for j in range(9)]
+    random.shuffle(celulas)
 
-        coloracao = graph.saturBFS(cores, preset)
-        if coloracao:
-            return graph._graph, tabuleiro, coloracao, cont
+    for linha, coluna in celulas:
+        backup = tabuleiro[linha][coluna]
+        tabuleiro[linha][coluna] = 0
 
-    return None, None, None
+        if _contar_solucoes([fila[:] for fila in tabuleiro]) != 1:
+            tabuleiro[linha][coluna] = backup
+
+    return graph._graph, tabuleiro, solucao, 1
+
+
+def gerar_tabuleiro():
+    return gerar_tabuleiro_unico()
 
 
 if __name__ == '__main__':

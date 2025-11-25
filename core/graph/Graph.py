@@ -36,31 +36,39 @@ class classGraph:
                 candidate = node
         return candidate
 
-    def saturBFS(self, available_colors, preset=None):
+    def satur_backtracking(self, available_colors, preset=None):
         colors = {} if preset is None else preset.copy()
-
+        #
         if preset:
             for node, color in preset.items():
                 for neighbor in self._graph[node]:
                     if colors.get(neighbor) == color:
                         return None
 
-        while len(colors) < len(self._graph):
-            node = self.highest_saturation(colors)
-            if node is None:
-                break
+        return self._satur_backtrack(colors, available_colors)
 
-            neighbor_colors = {
-                colors.get(neigh)
-                for neigh in self._graph[node]
-                if colors.get(neigh) is not None
-            }
+    def _satur_backtrack(self, colors, available_colors):
+        if len(colors) == len(self._graph):
+            return colors
 
-            for color in available_colors:
-                if color not in neighbor_colors:
-                    self.set_color(node, color, colors)
-                    break
-            else:
-                return None
+        node = self.highest_saturation(colors)
+        if node is None:
+            return colors
 
-        return colors
+        neighbor_colors = {
+            colors.get(neigh)
+            for neigh in self._graph[node]
+            if colors.get(neigh) is not None
+        }
+
+        for color in available_colors:
+            if color in neighbor_colors:
+                continue
+
+            colors[node] = color
+            result = self._satur_backtrack(colors, available_colors)
+            if result is not None:
+                return result
+            colors.pop(node)
+
+        return None

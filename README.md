@@ -52,14 +52,3 @@ python sudoku_main.py
 2. [`classGraph.satur_backtracking`](core/graph/Graph.py) colore nós com heurística DSATUR, garantindo solução consistente.
 3. `_contar_solucoes()` remove pistas até o puzzle manter uma única solução.
 4. `gerar_tabuleiro()` retorna conexões, puzzle parcial, solução e contador de tentativas.
-
-## Próximos passos sugeridos
-
-- Persistir melhores tempos/jogadores (ex.: SQLite ou JSON).
-- Exportar/importar puzzles (`.sdk`).
-- Ajustar dificuldade controlando quantidade mínima de pistas.
-- Adicionar testes unitários para `validate_current_board` e `_valor_valido`.
-
-## Licença e contato
-
-Defina a licença neste arquivo e inclua informações de contato/portfólio para contratantes interessados.
